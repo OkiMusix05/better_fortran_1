@@ -4,4 +4,4 @@ Therefore, I created this FORTRAN transpile that translates my custom scripting 
 As I am a physics student and not a Computer Science student, and making a transpiler is really, really hard, this project literally just uses REGEX to translate lines, but it gets the job done wonderfully
 # Version Log
 - **v0.0**: Initial commit, the transpiler can take a path to a .BTF file and accurately translate the main program, comments, variable declarations including matrices, and prints.
-- **v0.01**: Repository initializer
+- **v0.01**, **v0.011**: Repository initializer
