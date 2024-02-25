@@ -1,11 +1,11 @@
 // Comment
+use math::{pi, G}
 fn main() {
-    let x0:int = 437;
+    const x0:int = 437;
     let A:MATint3x3 = { 1, 2, 3
                       | 4, 5, 6
                       | 7, 8, 9 };
-    let xi:f8 = 0.;
-    const pi:f8 = 3.141592;
-    xi = x0*pi;
+    let xi:f4 = 0;
+    xi = x0*pi*G;
     print("Hello", xi);
 }

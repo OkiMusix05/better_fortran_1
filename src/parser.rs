@@ -7,6 +7,7 @@ enum Tokens {
     MainFunction,
     Expressions,
     Print, // Doesn't support formats yet
+    MathFuncs, // Includes pi, e, G
     //If,
 }
 
@@ -34,6 +35,8 @@ impl Tokens {
                }
              */
             //Tokens::If => ("", Regex::new(r"if *\((.*)\) *\{((?s).*?)}").unwrap()),
+            // use math::{pi, e, ...}
+            Tokens::MathFuncs => ("", Regex::new(r"use math::\{(.*)}").unwrap()),
         }
     }
     fn apply_replacement(&self, captures: &regex::Captures) -> String {
@@ -100,6 +103,27 @@ impl Tokens {
                 let content = captures.get(2).map_or("", |m| m.as_str());
                 format!("if({}) then{}endif", condition, content)
             }*/
+            Tokens::MathFuncs => {
+                let imports_str = captures.get(1).map_or("", |m| m.as_str());
+                let imports_list:Vec<&str> = if imports_str.is_empty() {
+                    Vec::new()
+                } else {
+                    imports_str.split(",").collect()
+                };
+                //let mut const_declarations:&str = "real*8 ::";
+                let mut const_decl_vec:Vec<&str> = vec![];
+                for import in imports_list {
+                    let imp = import.trim();
+                    match imp {
+                        "pi" => const_decl_vec.push("pi=4.D0*DATAN(1.D0)"),
+                        "e" => const_decl_vec.push("e=EXP(1.0)"),
+                        "G" => const_decl_vec.push("G = 6.67430E-11"),
+                        _ => ()
+                    }
+                }
+                let const_decl_str = "MODULE math\nreal*8, parameter :: ".to_owned() + const_decl_vec.join(", ").as_str() + "\nEND MODULE math";
+                const_decl_str
+            }
             _ => captures[0].to_string(), // For other tokens, return the whole match
         }
     }
@@ -115,14 +139,20 @@ pub(crate) fn parser(doc: &str) -> String {
         Tokens::Expressions,
         Tokens::Print,
         //Tokens::If,
+        Tokens::MathFuncs
     ];
 
     for token in &tokens {
         let (replacement, pattern) = token.pattern();
-        println!("{}", modified_doc);
         modified_doc = pattern.replace_all(&modified_doc, |caps: &regex::Captures| {
             token.apply_replacement(&caps)
         }).into_owned();
+    }
+
+    /// Add modules to functions that require it
+    // Main
+    if doc.contains("use math") {
+        modified_doc = modified_doc.replace("implicit none", "use math\nimplicit none");
     }
 
     modified_doc
