@@ -1,11 +1,26 @@
-// Comment
+// OkiScript BTF
 use math::{pi, G}
 fn main() {
     const x0:int = 437;
-    let A:MATint3x3 = { 1, 2, 3
-                      | 4, 5, 6
-                      | 7, 8, 9 };
-    let xi:f4 = 0;
-    xi = x0*pi*G;
-    print("Hello", xi);
+    let A:int<:,:>;
+    const B:int<3,3>  = [ 1, 2, 3
+                        | 4, 5, 6
+                        | 7, 8, 9 ];
+    const P:f8<3> = [1,2,3];
+    allocate(A(x0, x0));
+    C = A*B
+    if (C>A) {
+        print(C);
+    }
+    elif (B>C) {
+        while (i<n) {
+            print("Hello");
+        }
+        for (i=1, n, 1) {
+            a = b
+        }
+    }
+    else {
+        print("Not cool");
+    }
 }

@@ -1,16 +1,27 @@
 use std::ptr::replace;
 use regex::Regex;
+use std::sync::Mutex;
+mod expressions_eval;
+mod loop_conditional_parser;
 
 enum Tokens {
     Comments,
     Declaration, /// For variables and constants
     MainFunction,
+    IfElseLoops,
     Expressions,
     Print, // Doesn't support formats yet
     MathFuncs, // Includes pi, e, G
-    //If,
 }
 
+#[derive(Clone)]
+pub struct Matrix {
+    pub name:String,
+    pub m:i8,
+    pub n:i8
+}
+
+pub static mut MATRICES: Mutex<Vec<Matrix>> = Mutex::new(vec![]);
 impl Tokens {
     fn pattern(&self) -> (&'static str, Regex) {
         match self {
@@ -23,18 +34,19 @@ impl Tokens {
             // // Comment
             Tokens::Comments => ("", Regex::new(r"//(.+)").unwrap()),
             // let name:type = value;
-            Tokens::Declaration => ("", Regex::new(r"(const|let) ([a-zA-Z][a-zA-Z0-9]+|[a-zA-Z]) *: *([a-zA-Z][a-zA-Z0-9]+) *= *((?s).*?);").unwrap()),
-            // var1 = expression;
-            Tokens::Expressions => ("", Regex::new(r"([a-zA-Z][a-zA-Z0-9]+|[a-zA-Z]) *= *(.*);").unwrap()),
-            // print(thing);
-            Tokens::Print => ("", Regex::new(r"print\((.*)\);").unwrap()),
+            //Tokens::Declaration => ("", Regex::new(r"(const|let) ([a-zA-Z][a-zA-Z0-9]+|[a-zA-Z]) *: *([a-zA-Z][a-zA-Z0-9]+) *= *((?s).*?);").unwrap()),
+            Tokens::Declaration => ("", Regex::new(r"(const|let) ([a-zA-Z][a-zA-Z0-9]+|[a-zA-Z]) *: *([a-zA-Z][a-zA-Z0-9]+)<?([0-9]+|:)?,? *([0-9]+|:)?>? *=? *((?s).*?);").unwrap()),
             /* if(condition) {
                     code here
                } else {
                     more code
                }
              */
-            //Tokens::If => ("", Regex::new(r"if *\((.*)\) *\{((?s).*?)}").unwrap()),
+            Tokens::IfElseLoops => ("", Regex::new(r"(if|elif|else|for|while) *\((.*)\) *\n* *\{").unwrap()),
+            // var1 = expression;
+            Tokens::Expressions => ("", Regex::new(r"([a-zA-Z][a-zA-Z0-9]+|[a-zA-Z]) *= *(.*);").unwrap()),
+            // print(thing);
+            Tokens::Print => ("", Regex::new(r"print\((.*)\);").unwrap()),
             // use math::{pi, e, ...}
             Tokens::MathFuncs => ("", Regex::new(r"use math::\{(.*)}").unwrap()),
         }
@@ -54,55 +66,94 @@ impl Tokens {
                 let constorvar = captures.get(1).map_or("", |m| m.as_str());
                 let name = captures.get(2).map_or("", |m| m.as_str());
                 let mut data_type = captures.get(3).map_or("", |m| m.as_str());
-                let mut value = captures.get(4).map_or("", |m| m.as_str());
+                let mut m = captures.get(4).map_or("", |m| m.as_str()).trim();
+                let mut n = captures.get(5).map_or("", |m| m.as_str()).trim();
+                let mut value = captures.get(6).map_or("", |m| m.as_str());
                 let keyword:&str;
                 let mut mtx:String = String::from("");
                 let mut is_matrix:String = String::from("");
-                let mut data_type_string:String = String::from("");
                 let mut value_string:String = String::from("");
+                let mut order ;
                 if constorvar == "const" {
                     keyword = ", parameter";
                 } else {
                     keyword = "";
                 }
-                if data_type.contains("MAT") {
-                    let size = Regex::new(r"([0-9]+)x([0-9]+)").unwrap();
-                    if let Some(size_caps) = size.captures(&data_type) {
-                        let width = size_caps.get(1).unwrap().as_str();
-                        let height = size_caps.get(2).unwrap().as_str();
-                        mtx = format!("{}x{}", width, height);
-                        data_type_string = data_type.replace("MAT", "").replace(&mtx, "");
-                        is_matrix = format!(", dimension ({}, {})", width, height);
+                if m != "" {
+                    if n!= "" {
+                        mtx = format!("<{},{}>", m, n);
+                        is_matrix = format!(", dimension ({}, {})", m, n);
+                    } else {
+                        mtx = format!("<{}>", m);
+                        is_matrix = format!(", dimension ({})", m);
                     }
-                    value_string = value.replace("{", "").replace("}", "")
-                        .replace("\n", "").replace(" ", "").replace("|", ",");
-                    value_string = format!("reshape((/{}/), shape({}), order=(/2,1/))", value_string, name);
-                } else {
-                    data_type_string = data_type.to_string();
-                    value_string = value.to_string();
                 }
-                match data_type_string.as_str() {
-                    "int" => format!("integer{}{} :: {} = {}", keyword, is_matrix, name, value_string),
-                    "f4" => format!("real{}{} :: {} = {}", keyword, is_matrix, name, value_string),
-                    "f8" => format!("real*8{}{} :: {} = {}", keyword, is_matrix, name, value_string),
+                if value != "" {
+                    if m!= "" {
+                        unsafe {
+                            MATRICES.get_mut().unwrap().push(Matrix {
+                                name: String::from(name),
+                                m: m.parse().unwrap(),
+                                n: {
+                                    if n == "" { 1 } else {
+                                        if n == ":" {
+                                            0
+                                        } else {
+                                            n.parse().unwrap()
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                        value_string = value.replace("[", "").replace("]", "")
+                            .replace("\n", "").replace(" ", "").replace("|", ",");
+                        if n != "" {
+                            order = ", order=(/2,1/)";
+                        } else {
+                            order = "";
+                        }
+                        value_string = format!(" = reshape((/{}/), shape({}){})", value_string, name, order);
+                    }
+                } else {
+                    if m != "" && n != "" {
+                        value_string = format!("({},{})", m, n);
+                    } else if n == "" && m != "" {
+                        value_string = format!("({})", m)
+                    }
+                }
+                if m == "" && n == ""{
+                    if value != "" {
+                        value_string = format!(" = {}", value)
+                    } else {
+                        value_string = "".to_string();
+                    }
+                }
+                if m == ":" || n == ":" {
+                    is_matrix = ", allocatable".to_string();
+                }
+                match data_type {
+                    "int" => format!("integer{}{} :: {}{}", keyword, is_matrix, name, value_string),
+                    "f4" => format!("real{}{} :: {}{}", keyword, is_matrix, name, value_string),
+                    "f8" => format!("real*8{}{} :: {}{}", keyword, is_matrix, name, value_string),
                     _ => format!("{} :: {} = {}", data_type, name, value), // Handle other data types
                 }
+            },
+            Tokens::IfElseLoops => {
+                let which = captures.get(1).map_or("", |m| m.as_str());
+                let condition = captures.get(2).map_or("", |m| m.as_str());
+                format!("{} ({}) {}", which, condition, "{")
             }
             Tokens::Expressions => {
                 let recieve = captures.get(1).map_or("", |m| m.as_str());
                 let exp = captures.get(2).map_or("", |m| m.as_str());
+                //let exp:String = expressions_eval::func_from_exp(exp, matrices);
+                println!("Exp: {}", exp);
                 format!("{} = {}", recieve, exp)
             }
             Tokens::Print => {
                 let thing = captures.get(1).map_or("", |m| m.as_str());
                 format!("print*, {}", thing)
             }
-            /*Tokens::If => {
-
-                let condition = captures.get(1).map_or("", |m| m.as_str());
-                let content = captures.get(2).map_or("", |m| m.as_str());
-                format!("if({}) then{}endif", condition, content)
-            }*/
             Tokens::MathFuncs => {
                 let imports_str = captures.get(1).map_or("", |m| m.as_str());
                 let imports_list:Vec<&str> = if imports_str.is_empty() {
@@ -136,9 +187,9 @@ pub(crate) fn parser(doc: &str) -> String {
         Tokens::Comments,
         Tokens::Declaration,
         Tokens::MainFunction,
+        Tokens::IfElseLoops,
         Tokens::Expressions,
         Tokens::Print,
-        //Tokens::If,
         Tokens::MathFuncs
     ];
 
@@ -154,6 +205,9 @@ pub(crate) fn parser(doc: &str) -> String {
     if doc.contains("use math") {
         modified_doc = modified_doc.replace("implicit none", "use math\nimplicit none");
     }
+
+    // Format If's/Loops to the FORTRAN syntax
+    modified_doc = loop_conditional_parser::loop_conditional_replacer(modified_doc);
 
     modified_doc
 }

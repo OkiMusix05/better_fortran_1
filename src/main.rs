@@ -8,7 +8,7 @@ use std::process::{self, Command};
 fn main() {
     println!("BTF Path:");
     let mut input_path = String::new();
-    let mut btfcode:String = String::from("");
+    let mut btfcode: String = String::from("");
 
     /// Reads the path specified by the user
     match io::stdin().read_line(&mut input_path) {
@@ -45,6 +45,26 @@ fn main() {
             process::exit(1);
         }
     }
+    /// FORMAT ELIF'S AND ELSE'S BEFORE SENDING THEM
+    let lines:Vec<&str> = btfcode.split("\n").collect();
+    let mut new_lines:Vec<String> = vec![];
+    for mut l in 0..lines.len() {
+        if !lines[l].contains("elif") && !lines[l].contains("else") {
+            new_lines.push(lines[l].to_string());
+            continue
+        }
+        if (lines[l].contains("elif") || lines[l].contains("else")) && !lines[l].contains("}") {
+            let s = format!("{} {}", lines[l-1].trim_end(), lines[l].trim());
+            new_lines.pop();
+            new_lines.push(s);
+            continue
+        } else {
+            new_lines.push(lines[l].to_string());
+        }
+    }
+    btfcode = new_lines.join("\n");
+    println!("{}", btfcode);
+
     /// Error Handling PRE-translation
     if !btfcode.contains("fn main") {
         panic!("There is no main function");
@@ -60,6 +80,12 @@ fn main() {
     if ft_code.contains("const") {
         panic!("There are incorrect constant declarations");
     }*/
+    unsafe {
+        let matrices = parser::MATRICES.lock().unwrap().clone();
+        /*for matrix in matrices {
+            println!("{}: {},{}", matrix.name, matrix.m, matrix.n);
+        }*/
+    }
 
     /// Writing to output and compiling
     let output_file = "output.f90";
