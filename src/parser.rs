@@ -1,6 +1,9 @@
 use std::ptr::replace;
 use regex::Regex;
 use std::sync::Mutex;
+use std::collections::HashMap;
+use std::hash::Hash;
+
 mod expressions_eval;
 mod loop_conditional_parser;
 
@@ -22,6 +25,8 @@ pub struct Matrix {
 }
 
 pub static mut MATRICES: Mutex<Vec<Matrix>> = Mutex::new(vec![]);
+pub static mut VARIABLES:Vec<String> = vec![];
+static mut FOR_VARS:Vec<String> = vec![];
 impl Tokens {
     fn pattern(&self) -> (&'static str, Regex) {
         match self {
@@ -62,7 +67,7 @@ impl Tokens {
                 let newline = captures.get(2).map_or("", |m| m.as_str());
                 format!("!{}{}", comment, newline)
             }
-            Tokens::Declaration => {
+            Tokens::Declaration => unsafe {
                 let constorvar = captures.get(1).map_or("", |m| m.as_str());
                 let name = captures.get(2).map_or("", |m| m.as_str());
                 let mut data_type = captures.get(3).map_or("", |m| m.as_str());
@@ -90,21 +95,20 @@ impl Tokens {
                 }
                 if value != "" {
                     if m!= "" {
-                        unsafe {
-                            MATRICES.get_mut().unwrap().push(Matrix {
-                                name: String::from(name),
-                                m: m.parse().unwrap(),
-                                n: {
-                                    if n == "" { 1 } else {
-                                        if n == ":" {
-                                            0
-                                        } else {
-                                            n.parse().unwrap()
-                                        }
+                        // The unsafe part
+                        MATRICES.get_mut().unwrap().push(Matrix {
+                            name: String::from(name),
+                            m: m.parse().unwrap(),
+                            n: {
+                                if n == "" { 1 } else {
+                                    if n == ":" {
+                                        0
+                                    } else {
+                                        n.parse().unwrap()
                                     }
                                 }
-                            });
-                        }
+                            }
+                        });
                         value_string = value.replace("[", "").replace("]", "")
                             .replace("\n", "").replace(" ", "").replace("|", ",");
                         if n != "" {
@@ -119,6 +123,16 @@ impl Tokens {
                         value_string = format!("({},{})", m, n);
                     } else if n == "" && m != "" {
                         value_string = format!("({})", m)
+                    }
+                }
+                if constorvar == "let" && m == "" {
+                    if name.contains(",") {
+                        let vars:Vec<&str> = name.split(",").collect();
+                        for var in vars {
+                            VARIABLES.push(var.to_string());
+                        }
+                    } else {
+                        VARIABLES.push(name.to_string());
                     }
                 }
                 if m == "" && n == ""{
@@ -139,19 +153,27 @@ impl Tokens {
                     "int" => format!("integer{}{} :: {}{}", keyword, is_matrix, name, value_string),
                     "f4" => format!("real{}{} :: {}{}", keyword, is_matrix, name, value_string),
                     "f8" => format!("real*8{}{} :: {}{}", keyword, is_matrix, name, value_string),
-                    "str" => format!("character(len = {}) :: {}{}", value_string.len(), name, value_string),
+                    "str" => format!("character(len = {}) :: {}{}", value_string.len()-5, name, value_string),
                     "bool" => format!("logical :: {}{}", name, value_string),
                     _ => format!("{} :: {} = {}", data_type, name, value), // Handle other data types
                 }
             },
-            Tokens::IfElseLoops => {
+            Tokens::IfElseLoops => unsafe {
                 let which = captures.get(1).map_or("", |m| m.as_str());
                 let mut condition:String = String::from(captures.get(2).map_or("", |m| m.as_str()));
-                // Replace the logical operators
-                condition = condition.replace("===", ".eqv.").replace("!==", ".neqv.")
-                    .replace("==", ".eq.").replace("!=", ".neq.")
-                    .replace("&&", ".and.").replace("||", ".or.").replace("!", ".not.")
-                    .replace("true", ".true.").replace("false", ".false.");
+                if !condition.contains(",") {
+                    // Replace the logical operators
+                    condition = condition.replace("===", ".eqv.").replace("!==", ".neqv.")
+                        .replace("==", ".eq.").replace("!=", ".neq.")
+                        .replace("&&", ".and.").replace("||", ".or.").replace("!", ".not.")
+                        .replace("true", ".true.").replace("false", ".false.");
+                } else {
+                    let for_loop_variable:&str = Regex::new(r"([a-zA-Z]?[a-zA-Z0-9]+)=").unwrap()
+                        .captures(&condition).unwrap().get(1).map_or("", |m| m.as_str());
+                    if !VARIABLES.contains(&for_loop_variable.to_string()) {
+                        FOR_VARS.push(for_loop_variable.to_string());
+                    }
+                }
                 // Format the loops well for the loop_conditional_parser applied at the end
                 format!("{} ({}) {}", which, condition, "{")
             }
@@ -224,6 +246,13 @@ pub(crate) fn parser(doc: &str) -> String {
     // Replace special keywords
     modified_doc = modified_doc.replace("break;", "exit")// break loop function
         .replace("", ""); // Add more here
-
+    // Add For variable initializers
+    unsafe {
+        if FOR_VARS.len() != 0 {
+            let for_vars = FOR_VARS.join(", ");
+            let add_for_vars = format!("implicit none\n    integer :: {}", for_vars);
+            modified_doc = modified_doc.replace("implicit none", &add_for_vars);
+        }
+    }
     modified_doc
 }

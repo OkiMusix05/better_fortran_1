@@ -22,7 +22,7 @@ fn main() {
                 break;
             }
         }
-        for (i=1, n, 1) {
+        for (p=1, n, 1) {
             a = b
         }
     }

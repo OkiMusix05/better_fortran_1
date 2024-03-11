@@ -4,6 +4,7 @@ use std::io::{self, Write};
 use std::path::{Path};
 use std::fs::{self, File};
 use std::process::{self, Command};
+use crate::parser::VARIABLES;
 
 fn main() {
     println!("BTF Path:");
@@ -85,6 +86,7 @@ fn main() {
         for matrix in matrices {
             println!("{}: {},{}", matrix.name, matrix.m, matrix.n);
         }*/
+        //println!("{:?}", parser::VARIABLES);
     }
 
     /// Writing to output and compiling
