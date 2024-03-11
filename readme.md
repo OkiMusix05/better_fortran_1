@@ -38,3 +38,4 @@ As I am a physics student and not a Computer Science student, and making a trans
 - **v0.012**: Added the math module to be able to use pi, e, and G for now
 - **v0.02**: Added if/elif/else, while/for loops and the ability to nest them. Also made a new syntax for matrices and vectors that I like more. Now the program keeps track of matrices (unsafe rust).
 Support for allocation is partially added, since the basis is there but function calling is not part of the program yet.
+- **v0.021**: Added the *str* and *bool* types, as wel as logical operators. Also added breaks for loops

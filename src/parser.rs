@@ -35,7 +35,7 @@ impl Tokens {
             Tokens::Comments => ("", Regex::new(r"//(.+)").unwrap()),
             // let name:type = value;
             //Tokens::Declaration => ("", Regex::new(r"(const|let) ([a-zA-Z][a-zA-Z0-9]+|[a-zA-Z]) *: *([a-zA-Z][a-zA-Z0-9]+) *= *((?s).*?);").unwrap()),
-            Tokens::Declaration => ("", Regex::new(r"(const|let) ([a-zA-Z][a-zA-Z0-9]+|[a-zA-Z]) *: *([a-zA-Z][a-zA-Z0-9]+)<?([0-9]+|:)?,? *([0-9]+|:)?>? *=? *((?s).*?);").unwrap()),
+            Tokens::Declaration => ("", Regex::new(r"(const|let) ([a-zA-Z][a-zA-Z0-9, ]+|[a-zA-Z]) *: *([a-zA-Z][a-zA-Z0-9]+)<?([0-9]+|:)?,? *([0-9]+|:)?>? *=? *((?s).*?);").unwrap()),
             /* if(condition) {
                     code here
                } else {
@@ -55,7 +55,7 @@ impl Tokens {
         match self {
             Tokens::MainFunction => {
                 let content = captures.get(1).map_or("", |m| m.as_str());
-                format!("Program main\nimplicit none{}end program", content)
+                format!("Program main\nimplicit none{}stop\nend program", content)
             }
             Tokens::Comments => {
                 let comment = captures.get(1).map_or("", |m| m.as_str());
@@ -131,21 +131,34 @@ impl Tokens {
                 if m == ":" || n == ":" {
                     is_matrix = ", allocatable".to_string();
                 }
+                if data_type.trim() == "bool" {
+                    value_string = value_string.replace(".true.", "true")
+                        .replace(".false.", "false");
+                }
                 match data_type {
                     "int" => format!("integer{}{} :: {}{}", keyword, is_matrix, name, value_string),
                     "f4" => format!("real{}{} :: {}{}", keyword, is_matrix, name, value_string),
                     "f8" => format!("real*8{}{} :: {}{}", keyword, is_matrix, name, value_string),
+                    "str" => format!("character(len = {}) :: {}{}", value_string.len(), name, value_string),
+                    "bool" => format!("logical :: {}{}", name, value_string),
                     _ => format!("{} :: {} = {}", data_type, name, value), // Handle other data types
                 }
             },
             Tokens::IfElseLoops => {
                 let which = captures.get(1).map_or("", |m| m.as_str());
-                let condition = captures.get(2).map_or("", |m| m.as_str());
+                let mut condition:String = String::from(captures.get(2).map_or("", |m| m.as_str()));
+                // Replace the logical operators
+                condition = condition.replace("===", ".eqv.").replace("!==", ".neqv.")
+                    .replace("==", ".eq.").replace("!=", ".neq.")
+                    .replace("&&", ".and.").replace("||", ".or.").replace("!", ".not.")
+                    .replace("true", ".true.").replace("false", ".false.");
+                // Format the loops well for the loop_conditional_parser applied at the end
                 format!("{} ({}) {}", which, condition, "{")
             }
             Tokens::Expressions => {
                 let recieve = captures.get(1).map_or("", |m| m.as_str());
-                let exp = captures.get(2).map_or("", |m| m.as_str());
+                let mut exp = String::from(captures.get(2).map_or("", |m| m.as_str()));
+                exp = exp.replace("true", ".true.").replace("false", ".false.");
                 //let exp:String = expressions_eval::func_from_exp(exp, matrices);
                 println!("Exp: {}", exp);
                 format!("{} = {}", recieve, exp)
@@ -181,7 +194,7 @@ impl Tokens {
 }
 
 pub(crate) fn parser(doc: &str) -> String {
-    let mut modified_doc = String::from(doc);
+    let mut modified_doc:String = String::from(doc);
 
     let tokens = vec![
         Tokens::Comments,
@@ -208,6 +221,9 @@ pub(crate) fn parser(doc: &str) -> String {
 
     // Format If's/Loops to the FORTRAN syntax
     modified_doc = loop_conditional_parser::loop_conditional_replacer(modified_doc);
+    // Replace special keywords
+    modified_doc = modified_doc.replace("break;", "exit")// break loop function
+        .replace("", ""); // Add more here
 
     modified_doc
 }

@@ -48,7 +48,7 @@ fn main() {
     /// FORMAT ELIF'S AND ELSE'S BEFORE SENDING THEM
     let lines:Vec<&str> = btfcode.split("\n").collect();
     let mut new_lines:Vec<String> = vec![];
-    for mut l in 0..lines.len() {
+    for l in 0..lines.len() {
         if !lines[l].contains("elif") && !lines[l].contains("else") {
             new_lines.push(lines[l].to_string());
             continue
@@ -63,7 +63,7 @@ fn main() {
         }
     }
     btfcode = new_lines.join("\n");
-    println!("{}", btfcode);
+    //println!("{}", btfcode);
 
     /// Error Handling PRE-translation
     if !btfcode.contains("fn main") {
@@ -81,8 +81,8 @@ fn main() {
         panic!("There are incorrect constant declarations");
     }*/
     unsafe {
-        let matrices = parser::MATRICES.lock().unwrap().clone();
-        /*for matrix in matrices {
+        /*let matrices = parser::MATRICES.lock().unwrap().clone();
+        for matrix in matrices {
             println!("{}: {},{}", matrix.name, matrix.m, matrix.n);
         }*/
     }
