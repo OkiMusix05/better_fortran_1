@@ -81,13 +81,6 @@ fn main() {
     if ft_code.contains("const") {
         panic!("There are incorrect constant declarations");
     }*/
-    unsafe {
-        /*let matrices = parser::MATRICES.lock().unwrap().clone();
-        for matrix in matrices {
-            println!("{}: {},{}", matrix.name, matrix.m, matrix.n);
-        }*/
-        //println!("{:?}", parser::VARIABLES);
-    }
 
     /// Writing to output and compiling
     let output_file = "output.f90";

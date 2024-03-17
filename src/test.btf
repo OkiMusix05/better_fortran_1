@@ -1,32 +1,14 @@
-// OkiScript BTF
-use math::{pi, G}
 fn main() {
-    const x0:int = 437;
-    let A:int<:,:>;
-    const B:int<3,3>  = [ 1, 2, 3
-                        | 4, 5, 6
-                        | 7, 8, 9 ];
-    const P:f8<3> = [1,2,3];
-    let name:str = "Hello";
-    let t:bool = true;
-    let i, j, k:int;
-    allocate(A(x0, x0));
-    C = A*B
-    if (!t || i == 1) {
-        print(C);
+    //Hello this is cool
+    let t:bool = false;
+    let n:int = 10;
+    let h:f4 = 4.3;
+    for(i=1, n, 1) {
+        print(t);
+        t = t*10 + t;
+        break;
     }
-    elif (B>C) {
-        while (i<n) {
-            print("Hello");
-            if(i==3) {
-                break;
-            }
-        }
-        for (p=1, n, 1) {
-            a = b
-        }
-    }
-    else {
-        print("Not cool");
+    if(t === true) {
+        print(t);
     }
 }

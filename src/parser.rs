@@ -2,6 +2,7 @@ use std::ptr::replace;
 use regex::Regex;
 use std::sync::Mutex;
 use std::collections::HashMap;
+use std::env::var;
 use std::hash::Hash;
 
 mod expressions_eval;
@@ -20,8 +21,15 @@ enum Tokens {
 #[derive(Clone)]
 pub struct Matrix {
     pub name:String,
-    pub m:i8,
-    pub n:i8
+    pub m:u8,
+    pub n:u8
+}
+pub struct Mat {
+    m:u8,
+    n:u8
+}
+pub struct Var {
+    d_type:String,
 }
 
 pub static mut MATRICES: Mutex<Vec<Matrix>> = Mutex::new(vec![]);
@@ -56,7 +64,10 @@ impl Tokens {
             Tokens::MathFuncs => ("", Regex::new(r"use math::\{(.*)}").unwrap()),
         }
     }
-    fn apply_replacement(&self, captures: &regex::Captures) -> String {
+    fn apply_replacement(&self, captures: &regex::Captures, matrices:&mut HashMap<String, Mat>, variables:&mut HashMap<String, Var>, for_vars:&mut Vec<String>) -> String {
+        //let mut matrices:HashMap<String, Mat> = HashMap::new();
+        //let mut variables:HashMap<String, Var> = HashMap::new();
+        //let mut for_vars:Vec<String> = vec![];
         match self {
             Tokens::MainFunction => {
                 let content = captures.get(1).map_or("", |m| m.as_str());
@@ -67,7 +78,7 @@ impl Tokens {
                 let newline = captures.get(2).map_or("", |m| m.as_str());
                 format!("!{}{}", comment, newline)
             }
-            Tokens::Declaration => unsafe {
+            Tokens::Declaration => {
                 let constorvar = captures.get(1).map_or("", |m| m.as_str());
                 let name = captures.get(2).map_or("", |m| m.as_str());
                 let mut data_type = captures.get(3).map_or("", |m| m.as_str());
@@ -95,9 +106,7 @@ impl Tokens {
                 }
                 if value != "" {
                     if m!= "" {
-                        // The unsafe part
-                        MATRICES.get_mut().unwrap().push(Matrix {
-                            name: String::from(name),
+                        matrices.insert(String::from(name), Mat {
                             m: m.parse().unwrap(),
                             n: {
                                 if n == "" { 1 } else {
@@ -129,10 +138,10 @@ impl Tokens {
                     if name.contains(",") {
                         let vars:Vec<&str> = name.split(",").collect();
                         for var in vars {
-                            VARIABLES.push(var.to_string());
+                            variables.insert(var.to_string(), Var {d_type: String::from(data_type)});
                         }
                     } else {
-                        VARIABLES.push(name.to_string());
+                        variables.insert(String::from(name), Var {d_type: String::from(data_type)});
                     }
                 }
                 if m == "" && n == ""{
@@ -146,8 +155,8 @@ impl Tokens {
                     is_matrix = ", allocatable".to_string();
                 }
                 if data_type.trim() == "bool" {
-                    value_string = value_string.replace(".true.", "true")
-                        .replace(".false.", "false");
+                    value_string = value_string.replace("true", ".true.")
+                        .replace("false", ".false.");
                 }
                 match data_type {
                     "int" => format!("integer{}{} :: {}{}", keyword, is_matrix, name, value_string),
@@ -158,7 +167,7 @@ impl Tokens {
                     _ => format!("{} :: {} = {}", data_type, name, value), // Handle other data types
                 }
             },
-            Tokens::IfElseLoops => unsafe {
+            Tokens::IfElseLoops => {
                 let which = captures.get(1).map_or("", |m| m.as_str());
                 let mut condition:String = String::from(captures.get(2).map_or("", |m| m.as_str()));
                 if !condition.contains(",") {
@@ -170,8 +179,8 @@ impl Tokens {
                 } else {
                     let for_loop_variable:&str = Regex::new(r"([a-zA-Z]?[a-zA-Z0-9]+)=").unwrap()
                         .captures(&condition).unwrap().get(1).map_or("", |m| m.as_str());
-                    if !VARIABLES.contains(&for_loop_variable.to_string()) {
-                        FOR_VARS.push(for_loop_variable.to_string());
+                    if !variables.contains_key(&for_loop_variable.to_string()) {
+                        for_vars.push(for_loop_variable.to_string());
                     }
                 }
                 // Format the loops well for the loop_conditional_parser applied at the end
@@ -182,7 +191,7 @@ impl Tokens {
                 let mut exp = String::from(captures.get(2).map_or("", |m| m.as_str()));
                 exp = exp.replace("true", ".true.").replace("false", ".false.");
                 //let exp:String = expressions_eval::func_from_exp(exp, matrices);
-                println!("Exp: {}", exp);
+                //println!("Exp: {}", exp);
                 format!("{} = {}", recieve, exp)
             }
             Tokens::Print => {
@@ -228,10 +237,14 @@ pub(crate) fn parser(doc: &str) -> String {
         Tokens::MathFuncs
     ];
 
+    let mut matrices:HashMap<String, Mat> = HashMap::new();
+    let mut variables:HashMap<String, Var> = HashMap::new();
+    let mut for_vars:Vec<String> = vec![];
+
     for token in &tokens {
         let (replacement, pattern) = token.pattern();
         modified_doc = pattern.replace_all(&modified_doc, |caps: &regex::Captures| {
-            token.apply_replacement(&caps)
+            token.apply_replacement(&caps, &mut matrices, &mut variables, &mut for_vars)
         }).into_owned();
     }
 
@@ -247,12 +260,19 @@ pub(crate) fn parser(doc: &str) -> String {
     modified_doc = modified_doc.replace("break;", "exit")// break loop function
         .replace("", ""); // Add more here
     // Add For variable initializers
-    unsafe {
-        if FOR_VARS.len() != 0 {
-            let for_vars = FOR_VARS.join(", ");
-            let add_for_vars = format!("implicit none\n    integer :: {}", for_vars);
-            modified_doc = modified_doc.replace("implicit none", &add_for_vars);
-        }
+    if for_vars.len() != 0 {
+        let for_vars = for_vars.join(", ");
+        let add_for_vars = format!("implicit none\n    integer :: {}", for_vars);
+        modified_doc = modified_doc.replace("implicit none", &add_for_vars);
     }
+    // Merge the for variables with the whole variables
+    for var in for_vars {
+        variables.insert(var, Var {
+            d_type:String::from("int")
+        });
+    }
+    /*for (name, var) in variables {
+        println!("{}, {}", name, var.d_type)
+    }*/
     modified_doc
 }
