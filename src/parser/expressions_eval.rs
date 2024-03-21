@@ -100,7 +100,8 @@ pub(crate) fn convert_to_function_calls(expr: Expr) -> String {
 pub(crate) fn func_from_exp(expression: &str) -> String {
     convert_to_function_calls(separate_and_calculate(expression))
 }*/
-use std::fmt;
+/*use std::fmt;
+
 // Enum to represent expressions
 pub enum Expr {
     Number(f64),
@@ -255,4 +256,4 @@ pub(crate) fn convert_to_function_calls(expr: Expr) -> String {
 pub(crate) fn func_from_exp(expression: &str, matrix_vars: Vec<String>) -> String {
     println!("Matrix: {:?}", matrix_vars);
     convert_to_function_calls(separate_and_calculate(expression, matrix_vars))
-}
+}*/

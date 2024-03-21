@@ -1,5 +1,5 @@
 use std::ptr::replace;
-use regex::Regex;
+use regex::{Match, Regex};
 use std::sync::Mutex;
 use std::collections::HashMap;
 use std::env::var;
@@ -18,23 +18,13 @@ enum Tokens {
     MathFuncs, // Includes pi, e, G
 }
 
-#[derive(Clone)]
 pub struct Matrix {
-    pub name:String,
-    pub m:u8,
-    pub n:u8
-}
-pub struct Mat {
     m:u8,
     n:u8
 }
-pub struct Var {
+pub struct Variable {
     d_type:String,
 }
-
-pub static mut MATRICES: Mutex<Vec<Matrix>> = Mutex::new(vec![]);
-pub static mut VARIABLES:Vec<String> = vec![];
-static mut FOR_VARS:Vec<String> = vec![];
 impl Tokens {
     fn pattern(&self) -> (&'static str, Regex) {
         match self {
@@ -48,7 +38,7 @@ impl Tokens {
             Tokens::Comments => ("", Regex::new(r"//(.+)").unwrap()),
             // let name:type = value;
             //Tokens::Declaration => ("", Regex::new(r"(const|let) ([a-zA-Z][a-zA-Z0-9]+|[a-zA-Z]) *: *([a-zA-Z][a-zA-Z0-9]+) *= *((?s).*?);").unwrap()),
-            Tokens::Declaration => ("", Regex::new(r"(const|let) ([a-zA-Z][a-zA-Z0-9, ]+|[a-zA-Z]) *: *([a-zA-Z][a-zA-Z0-9]+)<?([0-9]+|:)?,? *([0-9]+|:)?>? *=? *((?s).*?);").unwrap()),
+            Tokens::Declaration => ("", Regex::new(r"(const|var) ([a-zA-Z][a-zA-Z0-9, ]+|[a-zA-Z]) *: *([a-zA-Z][a-zA-Z0-9]+)<?([0-9]+|:)?,? *([0-9]+|:)?>? *=? *((?s).*?);").unwrap()),
             /* if(condition) {
                     code here
                } else {
@@ -64,7 +54,7 @@ impl Tokens {
             Tokens::MathFuncs => ("", Regex::new(r"use math::\{(.*)}").unwrap()),
         }
     }
-    fn apply_replacement(&self, captures: &regex::Captures, matrices:&mut HashMap<String, Mat>, variables:&mut HashMap<String, Var>, for_vars:&mut Vec<String>) -> String {
+    fn apply_replacement(&self, captures: &regex::Captures, matrices:&mut HashMap<String, Matrix>, variables:&mut HashMap<String, Variable>, for_vars:&mut Vec<String>) -> String {
         //let mut matrices:HashMap<String, Mat> = HashMap::new();
         //let mut variables:HashMap<String, Var> = HashMap::new();
         //let mut for_vars:Vec<String> = vec![];
@@ -106,8 +96,8 @@ impl Tokens {
                 }
                 if value != "" {
                     if m!= "" {
-                        matrices.insert(String::from(name), Mat {
-                            m: m.parse().unwrap(),
+                        matrices.insert(String::from(name), Matrix {
+                            m: m.parse().unwrap_or(0),
                             n: {
                                 if n == "" { 1 } else {
                                     if n == ":" {
@@ -134,14 +124,14 @@ impl Tokens {
                         value_string = format!("({})", m)
                     }
                 }
-                if constorvar == "let" && m == "" {
+                if constorvar == "var" && m == "" {
                     if name.contains(",") {
                         let vars:Vec<&str> = name.split(",").collect();
                         for var in vars {
-                            variables.insert(var.to_string(), Var {d_type: String::from(data_type)});
+                            variables.insert(var.to_string(), Variable {d_type: String::from(data_type)});
                         }
                     } else {
-                        variables.insert(String::from(name), Var {d_type: String::from(data_type)});
+                        variables.insert(String::from(name), Variable {d_type: String::from(data_type)});
                     }
                 }
                 if m == "" && n == ""{
@@ -224,7 +214,15 @@ impl Tokens {
     }
 }
 
-pub(crate) fn parser(doc: &str) -> String {
+#[derive(Default)]
+pub enum FortranVersion {
+    V77,
+    #[default]
+    V90,
+    V2003,
+    V2023
+}
+pub(crate) fn parser(doc: &str, version:FortranVersion) -> String {
     let mut modified_doc:String = String::from(doc);
 
     let tokens = vec![
@@ -237,8 +235,8 @@ pub(crate) fn parser(doc: &str) -> String {
         Tokens::MathFuncs
     ];
 
-    let mut matrices:HashMap<String, Mat> = HashMap::new();
-    let mut variables:HashMap<String, Var> = HashMap::new();
+    let mut matrices:HashMap<String, Matrix> = HashMap::new();
+    let mut variables:HashMap<String, Variable> = HashMap::new();
     let mut for_vars:Vec<String> = vec![];
 
     for token in &tokens {
@@ -267,7 +265,7 @@ pub(crate) fn parser(doc: &str) -> String {
     }
     // Merge the for variables with the whole variables
     for var in for_vars {
-        variables.insert(var, Var {
+        variables.insert(var, Variable {
             d_type:String::from("int")
         });
     }

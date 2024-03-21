@@ -4,7 +4,7 @@ use std::io::{self, Write};
 use std::path::{Path};
 use std::fs::{self, File};
 use std::process::{self, Command};
-use crate::parser::VARIABLES;
+use crate::parser::FortranVersion;
 
 fn main() {
     println!("BTF Path:");
@@ -72,7 +72,8 @@ fn main() {
     }
 
     /// Translation
-    let ft_code = parser::parser(btfcode.as_str());
+    let version:FortranVersion = FortranVersion::default();
+    let ft_code = parser::parser(btfcode.as_str(), version);
     println!("{}", ft_code);
     /// Error handling post-translation
     /*if ft_code.contains("let") {
@@ -82,6 +83,7 @@ fn main() {
         panic!("There are incorrect constant declarations");
     }*/
 
+    // Add support for other versions later
     /// Writing to output and compiling
     let output_file = "output.f90";
     //let mut file = File::create(output_file).expect("Failed to create file");

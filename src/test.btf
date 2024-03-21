@@ -1,8 +1,12 @@
 fn main() {
     //Hello this is cool
-    let t:bool = false;
-    let n:int = 10;
-    let h:f4 = 4.3;
+    var t:bool = false;
+    var n:int = 10;
+    var A:f8<3,3> = [ 3, 2, 1
+                    | 4, 5, 6
+                    | 8, 9, 3 ];
+    var B:f8<:,:>;
+    var h:f4 = 4.3;
     for(i=1, n, 1) {
         print(t);
         t = t*10 + t;

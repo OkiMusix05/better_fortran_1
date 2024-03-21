@@ -5,7 +5,7 @@ As I am a physics student and not a Computer Science student, and making a trans
 # Keywords
 - *fn main() {}*
   - The main function under which everything should go, except functions and subroutines
-- *let*
+- *var*
   - Creates a variable
 - *const*
   - Creates a constant
@@ -41,3 +41,4 @@ Support for allocation is partially added, since the basis is there but function
 - **v0.021**: Added the *str* and *bool* types, as wel as logical operators. Also added breaks for loops
 - **v0.022**: Added this nice feature where you don't have to explicitly declare the for loop variable. If you don't declare it, the transpiler automatically declares it for you, and if you do, the program lets you be :)
 - **v0.023**: Made the code safe by Rust's standards, removing dynamic global variables
+- **v0.024**: Some fixes, and changed let to var as I thought this is more scientist-friendly.
